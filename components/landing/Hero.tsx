@@ -12,7 +12,7 @@ export function Hero() {
         className="animate-fade-in-up m-0 max-w-md text-base leading-relaxed text-secondary"
         style={{ animationDelay: "80ms" }}
       >
-        ConsultAI is an AI project consultant for people who need serious software built —
+        ScopeAI is an AI project consultant for people who need serious software built —
         student capstones and business systems alike. Answer one sharp question at a time, skip
         the static intake forms, and walk away with a polished project brief plus a transparent
         cost and timeline estimate.

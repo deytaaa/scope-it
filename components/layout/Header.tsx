@@ -6,7 +6,7 @@ export function Header() {
     <header className="border-b-[0.5px] border-border bg-chrome transition-colors duration-150">
       <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
         <Link href="/" className="font-mono text-sm text-primary transition-colors duration-150">
-          ConsultAI
+          ScopeAI
         </Link>
         <nav className="flex items-center gap-6">
           <Link

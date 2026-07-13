@@ -1,10 +1,10 @@
 export default function AboutPage() {
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
-      <h1 className="mb-6 text-2xl font-medium text-primary">About ConsultAI</h1>
+      <h1 className="mb-6 text-2xl font-medium text-primary">About ScopeAI</h1>
       <div className="flex flex-col gap-4 text-sm leading-relaxed text-secondary">
         <p className="m-0">
-          ConsultAI is a conversational alternative to the usual project intake form. Instead of
+          ScopeAI is a conversational alternative to the usual project intake form. Instead of
           filling out fields, you talk through what you&apos;re building with an AI project
           consultant — the kind of back-and-forth you&apos;d have with a developer on a discovery
           call, minus the scheduling.

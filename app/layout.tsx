@@ -9,7 +9,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ConsultAI",
+  title: "ScopeAI",
   description: "A conversational project intake assistant.",
 };
 

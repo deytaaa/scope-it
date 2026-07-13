@@ -5,7 +5,7 @@ export default function ProjectsPage() {
     <main className="mx-auto max-w-4xl px-6 py-16">
       <h1 className="mb-2 text-2xl font-medium text-primary">Projects</h1>
       <p className="mb-10 text-sm text-secondary">
-        A few things we&apos;ve built together with clients through ConsultAI.
+        A few things we&apos;ve built together with clients through ScopeAI.
       </p>
 
       {projects.length === 0 ? (
