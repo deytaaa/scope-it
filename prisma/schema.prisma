@@ -1,0 +1,62 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")   // pooled — used by Prisma Client at runtime
+  directUrl = env("DIRECT_URL")     // direct — used only by `prisma migrate`
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Session {
+  id           String        @id @default(cuid())
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  status       String        @default("active") // active | awaiting_confirmation | awaiting_contact_info | complete | complete-partial | abandoned
+  contactName  String?
+  contactEmail String?
+  messages     Message[]
+  requirement  Requirement?
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id])
+  role      String   // "user" | "assistant"
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model Requirement {
+  id              String   @id @default(cuid())
+  sessionId       String   @unique
+  session         Session  @relation(fields: [sessionId], references: [id])
+
+  projectCategory String?  // "capstone" | "commercial" — asked turn 1, drives question branching
+  projectType     String?
+  purposeGoals    String?
+  targetAudience  String?
+  coreFeatures    Json?    // { name: string; complexity: "simple" | "complex" }[]
+  designPrefs     Json?    // { style, colors, inspirationUrls: string[] }
+  brandingAssets  Json?    // { hasLogo, hasContent, notes }
+  techStack       String?
+  platformType    String?  // "web" | "mobile" | "desktop"
+  schoolRequirements    String? // capstone-only: adviser/school constraints
+  userRoles             Json?   // string[] — who uses the system (Admin/Staff/Manager...)
+  requestedTimelineDays Int?    // structured version of a stated deadline, drives the rush multiplier
+  timeline        String?
+  budget          String?
+  additionalNotes String?
+
+  isComplete      Boolean  @default(false)
+  summaryMarkdown String?
+
+  estimatedCost            Int?     // ₱, final computed price
+  estimatedTimelineDaysMin Int?
+  estimatedTimelineDaysMax Int?
+  quoteMarkdown            String?
+  pricingBreakdown         Json?    // itemized line items backing estimatedCost
+
+  updatedAt       DateTime @updatedAt
+}
