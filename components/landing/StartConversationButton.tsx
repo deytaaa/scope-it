@@ -34,7 +34,7 @@ export function StartConversationButton({ className }: StartConversationButtonPr
   return (
     <div className={["flex flex-col items-center gap-3", className].filter(Boolean).join(" ")}>
       <Pill onClick={startConversation} disabled={isStarting}>
-        {isStarting ? "Starting…" : "Start a conversation"}
+        {isStarting ? "Starting…" : "Get my project estimate"}
       </Pill>
       {error && <p className="m-0 text-sm text-secondary">{error}</p>}
     </div>

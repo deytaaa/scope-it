@@ -2,16 +2,16 @@ import { Card } from "@/components/ui/Card";
 
 const SECTIONS = [
   {
-    title: "Project basics",
-    description: "What you're building, who it's for, and what problem it solves.",
+    title: "Project scope",
+    description: "What you're building, who it's for, and the outcome you actually need.",
   },
   {
-    title: "Features and design",
-    description: "The must-have features and how you want the product to look and feel.",
+    title: "Features & design",
+    description: "The functionality that matters most, and how you want it to look and feel.",
   },
   {
-    title: "Logistics",
-    description: "Timeline, budget, and any technical constraints you already know about.",
+    title: "Cost & timeline",
+    description: "Your budget and deadline, turned into a clear, itemized estimate — not a guess.",
   },
 ];
 
