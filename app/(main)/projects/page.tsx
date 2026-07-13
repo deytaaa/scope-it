@@ -18,7 +18,7 @@ export default function ProjectsPage() {
               href={project.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="block overflow-hidden rounded-card border-[0.5px] border-border bg-card"
+              className="block overflow-hidden rounded-card border-[0.5px] border-border bg-card transition-all duration-150 hover:-translate-y-0.5 hover:border-secondary"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- thumbnails are arbitrary external URLs, not part of the app's own asset pipeline */}
               <img

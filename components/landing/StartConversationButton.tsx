@@ -6,9 +6,10 @@ import { Pill } from "@/components/ui/Pill";
 
 interface StartConversationButtonProps {
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export function StartConversationButton({ className }: StartConversationButtonProps) {
+export function StartConversationButton({ className, style }: StartConversationButtonProps) {
   const router = useRouter();
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +33,7 @@ export function StartConversationButton({ className }: StartConversationButtonPr
   }
 
   return (
-    <div className={["flex flex-col items-center gap-3", className].filter(Boolean).join(" ")}>
+    <div className={["flex flex-col items-center gap-3", className].filter(Boolean).join(" ")} style={style}>
       <Pill onClick={startConversation} disabled={isStarting}>
         {isStarting ? "Starting…" : "Get my project estimate"}
       </Pill>
