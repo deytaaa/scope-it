@@ -9,6 +9,19 @@ export const requirementsResponseSchema = {
       type: Type.OBJECT,
       properties: {
         projectType: { type: Type.STRING },
+        // Declared early, ahead of the large/verbose fields below (coreFeatures,
+        // userRoles). Gemini's structured output tends to generate JSON in
+        // schema property order, so a bloated array field earlier in the object
+        // can crowd out generation budget/attention for whatever comes after it
+        // — observed in production: a turn correctly containing a new name,
+        // email, and budget in the client's message still came back with
+        // contactEmail and budget silently missing from extracted_fields,
+        // because the model spent its effort re-deriving a verbose userRoles
+        // list first. Putting these three right after projectType makes them
+        // far less likely to get crowded out on the turn they actually matter.
+        contactName: { type: Type.STRING },
+        contactEmail: { type: Type.STRING },
+        budget: { type: Type.STRING },
         purposeGoals: { type: Type.STRING },
         targetAudience: { type: Type.STRING },
         coreFeatures: {
@@ -44,10 +57,7 @@ export const requirementsResponseSchema = {
         userRoles: { type: Type.ARRAY, items: { type: Type.STRING }, maxItems: "15" },
         requestedTimelineDays: { type: Type.INTEGER },
         timeline: { type: Type.STRING },
-        budget: { type: Type.STRING },
         additionalNotes: { type: Type.STRING },
-        contactName: { type: Type.STRING },
-        contactEmail: { type: Type.STRING },
       },
     },
   },
