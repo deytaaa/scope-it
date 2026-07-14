@@ -22,7 +22,11 @@ const SCALAR_FIELDS = [
   "additionalNotes",
 ] as const;
 
-const ARRAY_FIELDS = ["coreFeatures", "userRoles"] as const;
+// Mirrors the maxItems caps in lib/requirements-schema.ts — a second,
+// independent line of defense in case a degenerate generation ever slips
+// past the schema-level constraint.
+const ARRAY_FIELD_CAPS = { coreFeatures: 40, userRoles: 15 } as const;
+const ARRAY_FIELDS = Object.keys(ARRAY_FIELD_CAPS) as (keyof typeof ARRAY_FIELD_CAPS)[];
 
 const ACTIVE_STATUSES = ["active", "awaiting_contact_info"];
 
@@ -45,9 +49,14 @@ function joinWithAnd(items: string[]): string {
 // so a turn with no update for a field never clobbers a previously saved value.
 function toRequirementUpdate(fields: ExtractedFields) {
   const data: Record<string, unknown> = {};
-  for (const field of [...SCALAR_FIELDS, ...ARRAY_FIELDS]) {
+  for (const field of SCALAR_FIELDS) {
     if (hasContent(fields[field])) {
       data[field] = fields[field];
+    }
+  }
+  for (const field of ARRAY_FIELDS) {
+    if (hasContent(fields[field])) {
+      data[field] = (fields[field] as unknown[]).slice(0, ARRAY_FIELD_CAPS[field]);
     }
   }
   return data;

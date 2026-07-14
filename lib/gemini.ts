@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { requirementsResponseSchema, type GeminiTurnResponse } from "./requirements-schema";
+import { requirementsResponseSchema, type ExtractedFields, type GeminiTurnResponse } from "./requirements-schema";
 
 let ai: GoogleGenAI | undefined;
 
@@ -48,6 +48,64 @@ export interface ChatHistoryTurn {
   content: string;
 }
 
+// Real short fields (names, emails, single-word/short-phrase values) vs.
+// fields that legitimately hold a paragraph of prose.
+const SHORT_FIELDS: (keyof ExtractedFields)[] = [
+  "projectType",
+  "platformType",
+  "techStack",
+  "timeline",
+  "budget",
+  "contactName",
+  "contactEmail",
+];
+const LONG_FIELDS: (keyof ExtractedFields)[] = [
+  "purposeGoals",
+  "targetAudience",
+  "designPrefs",
+  "additionalNotes",
+];
+const MAX_SHORT_FIELD_LENGTH = 300;
+const MAX_LONG_FIELD_LENGTH = 3000;
+const MAX_ARRAY_ITEM_LENGTH = 100;
+
+// Defends against malformed structured output (observed in production: a
+// runaway generation produced a userRoles array containing a many-paragraph
+// essay plus raw fragments of *other* fields' names/values bled into the
+// same array, silently losing that data since it never landed in its real
+// field). Rather than try to merge whatever survived, reject the whole turn
+// so the caller's existing retry-safe error handling kicks in — nothing
+// gets persisted from a turn that fails this check.
+function assertSaneTurn(turn: GeminiTurnResponse): void {
+  if (turn.reply_to_user.length > MAX_LONG_FIELD_LENGTH) {
+    throw new Error("Gemini response failed sanity check: reply_to_user is implausibly long");
+  }
+
+  for (const field of SHORT_FIELDS) {
+    const value = turn.extracted_fields[field];
+    if (typeof value === "string" && value.length > MAX_SHORT_FIELD_LENGTH) {
+      throw new Error(`Gemini response failed sanity check: "${field}" is implausibly long`);
+    }
+  }
+  for (const field of LONG_FIELDS) {
+    const value = turn.extracted_fields[field];
+    if (typeof value === "string" && value.length > MAX_LONG_FIELD_LENGTH) {
+      throw new Error(`Gemini response failed sanity check: "${field}" is implausibly long`);
+    }
+  }
+
+  for (const role of turn.extracted_fields.userRoles ?? []) {
+    if (typeof role !== "string" || role.length > MAX_ARRAY_ITEM_LENGTH) {
+      throw new Error("Gemini response failed sanity check: a userRoles entry is malformed");
+    }
+  }
+  for (const feature of turn.extracted_fields.coreFeatures ?? []) {
+    if (!feature || typeof feature.name !== "string" || feature.name.length > MAX_ARRAY_ITEM_LENGTH) {
+      throw new Error("Gemini response failed sanity check: a coreFeatures entry is malformed");
+    }
+  }
+}
+
 export async function getNextTurn(history: ChatHistoryTurn[]): Promise<GeminiTurnResponse> {
   const model = process.env.GEMINI_MODEL;
   if (!model) {
@@ -66,6 +124,12 @@ export async function getNextTurn(history: ChatHistoryTurn[]): Promise<GeminiTur
       systemInstruction: SYSTEM_PROMPT,
       responseMimeType: "application/json",
       responseSchema: requirementsResponseSchema,
+      // Firm ceiling against degenerate/runaway generations (observed in
+      // production: a malformed turn generated tens of thousands of tokens
+      // of repeated junk into an array field). A normal turn is a few
+      // hundred tokens at most — this fails fast and cheap instead of
+      // burning a slow, expensive response either way.
+      maxOutputTokens: 2048,
     },
   });
 
@@ -74,5 +138,18 @@ export async function getNextTurn(history: ChatHistoryTurn[]): Promise<GeminiTur
     throw new Error("Gemini returned an empty response");
   }
 
-  return JSON.parse(text) as GeminiTurnResponse;
+  let parsed: GeminiTurnResponse;
+  try {
+    parsed = JSON.parse(text) as GeminiTurnResponse;
+  } catch {
+    // Truncated/malformed JSON from a runaway generation hitting the token
+    // cap. Treat it the same as any other upstream failure — the caller
+    // (app/api/chat/route.ts) already handles this by returning a clean 502
+    // without persisting anything, so the turn isn't burned against the
+    // user's turn cap or message-rate limit.
+    throw new Error("Gemini returned malformed JSON (likely a truncated runaway generation)");
+  }
+
+  assertSaneTurn(parsed);
+  return parsed;
 }

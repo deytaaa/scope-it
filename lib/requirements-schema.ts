@@ -13,6 +13,13 @@ export const requirementsResponseSchema = {
         targetAudience: { type: Type.STRING },
         coreFeatures: {
           type: Type.ARRAY,
+          // Bounded to guard against runaway/degenerate generation — without
+          // a cap, a bad generation can balloon this array until it consumes
+          // the entire output and crowds out every other field in the same
+          // turn (observed in production: a malformed turn produced hundreds
+          // of near-duplicate entries and silently dropped reply_to_user,
+          // contactName, contactEmail, and budget in the same response).
+          maxItems: "40",
           items: {
             type: Type.OBJECT,
             properties: {
@@ -33,7 +40,8 @@ export const requirementsResponseSchema = {
           format: "enum",
           enum: ["web", "mobile", "desktop"],
         },
-        userRoles: { type: Type.ARRAY, items: { type: Type.STRING } },
+        // Same runaway-generation guard as coreFeatures above.
+        userRoles: { type: Type.ARRAY, items: { type: Type.STRING }, maxItems: "15" },
         requestedTimelineDays: { type: Type.INTEGER },
         timeline: { type: Type.STRING },
         budget: { type: Type.STRING },
