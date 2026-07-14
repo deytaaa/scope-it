@@ -80,6 +80,32 @@ body {
   pointer-events: none;
 }
 
+/* Cursor-driven tilt. --mx/--my (0-1 fractions of the viewport) are written
+   directly to this element's style by KineticGrid.tsx on pointer move, bypassing
+   React state entirely so movement never causes a re-render. The transition
+   below is what turns those discrete JS updates into a smooth eased "catch up"
+   instead of the grid snapping straight to the cursor. Falls back to centered
+   (no tilt) on touch devices and reduced-motion, since the component never
+   attaches its listeners in those cases and --mx/--my simply stay unset. */
+.kinetic-grid__parallax {
+  position: absolute;
+  inset: 0;
+  transform: translate3d(
+    calc((var(--mx, 0.5) - 0.5) * var(--parallax-strength)),
+    calc((var(--my, 0.5) - 0.5) * var(--parallax-strength)),
+    0
+  );
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.kinetic-grid__parallax--fine {
+  --parallax-strength: 14px;
+}
+
+.kinetic-grid__parallax--bold {
+  --parallax-strength: 26px;
+}
+
 .kinetic-grid__layer {
   position: absolute;
   inset: -10%;
@@ -102,6 +128,28 @@ body {
   background-size: 168px 168px;
   opacity: 0.6;
   animation: kinetic-grid-drift-bold 160s linear infinite;
+}
+
+/* Soft glow that follows the cursor, blended (not just overlaid) with the grid
+   so it reads as a highlight on the lines themselves rather than a bright
+   circle sitting on top of them. Stays invisible until KineticGrid.tsx marks
+   the grid active on the first pointer move — so it never renders as a fixed
+   dot in the corner before the user has moved their mouse. */
+.kinetic-grid__spotlight {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(
+    circle 380px at calc(var(--mx, 0.5) * 100%) calc(var(--my, 0.5) * 100%),
+    color-mix(in srgb, var(--text-primary) 16%, transparent),
+    transparent 70%
+  );
+  mix-blend-mode: soft-light;
+  transition: opacity 0.5s ease;
+}
+
+.kinetic-grid[data-active="true"] .kinetic-grid__spotlight {
+  opacity: 0.8;
 }
 
 /* Fades the grid out toward the center reading column and back in at the
@@ -134,5 +182,12 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .kinetic-grid__layer {
     animation: none;
+  }
+  .kinetic-grid__parallax {
+    transition: none;
+  }
+  .kinetic-grid__spotlight {
+    transition: none;
+    opacity: 0 !important;
   }
 }
