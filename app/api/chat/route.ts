@@ -31,6 +31,9 @@ const ARRAY_FIELDS = Object.keys(ARRAY_FIELD_CAPS) as (keyof typeof ARRAY_FIELD_
 const ACTIVE_STATUSES = ["active", "awaiting_contact_info"];
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Unanchored variant of EMAIL_PATTERN, for finding an email inside a free-text
+// message rather than validating a whole string against it.
+const EMAIL_SEARCH_PATTERN = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 
 function hasContent(value: unknown): boolean {
   if (value === undefined || value === null) return false;
@@ -109,7 +112,8 @@ export async function POST(request: Request) {
   let turn;
   try {
     turn = await getNextTurn(history);
-  } catch {
+  } catch (err) {
+    console.error("getNextTurn failed:", err);
     return NextResponse.json(
       { error: "Couldn't reach the assistant right now. Please try again." },
       { status: 502 }
@@ -171,7 +175,14 @@ export async function POST(request: Request) {
 
   if (session.status === "awaiting_contact_info") {
     const providedName = turn.extracted_fields.contactName?.trim();
-    const providedEmail = turn.extracted_fields.contactEmail?.trim();
+    // Email has an unambiguous, easily-verified format, unlike the other two
+    // contact fields — extraction shouldn't depend on model reliability for it.
+    // Observed in production: a message containing a name, email, and budget
+    // together came back from the model with only the name extracted. Fall
+    // back to pulling the email straight out of the raw message when the
+    // model didn't find one.
+    const providedEmail =
+      turn.extracted_fields.contactEmail?.trim() || message.match(EMAIL_SEARCH_PATTERN)?.[0];
     const invalidEmail = providedEmail !== undefined && !EMAIL_PATTERN.test(providedEmail);
 
     const finalName: string | null = providedName || session.contactName;
