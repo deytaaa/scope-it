@@ -82,7 +82,7 @@ export function ChatWindow({ sessionId, initialMessages = [], initialStatus = "a
       </div>
 
       {isComplete ? (
-        <div className="sticky bottom-0 flex flex-col items-center gap-4 bg-page pb-6 pt-4 text-center">
+        <div className="sticky bottom-0 flex flex-col items-center gap-4 pb-6 pt-4 text-center">
           <p className="text-sm text-secondary">
             This conversation is complete. Thanks for the details — we&apos;ll be in touch.
           </p>
@@ -91,7 +91,7 @@ export function ChatWindow({ sessionId, initialMessages = [], initialStatus = "a
           </Link>
         </div>
       ) : (
-        <div className="sticky bottom-0 flex flex-col gap-2 bg-page pb-6 pt-4">
+        <div className="sticky bottom-0 flex flex-col gap-2 pb-6 pt-4">
           <ChatInput value={inputValue} onChange={setInputValue} onSubmit={handleSend} disabled={isLoading} />
           {error && <p className="text-sm text-secondary">{error}</p>}
         </div>
