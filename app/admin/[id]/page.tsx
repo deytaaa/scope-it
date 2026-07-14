@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { generateSummaryMarkdown } from "@/lib/summary";
+import { RATE_CARD } from "@/lib/pricing";
 import { Card } from "@/components/ui/Card";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 
@@ -42,24 +43,29 @@ export default async function AdminDetailPage({
     notFound();
   }
 
-  const summaryMarkdown = session.requirement ? generateSummaryMarkdown(session.requirement) : null;
+  const summaryMarkdown =
+    session.requirement?.summaryMarkdown ??
+    (session.requirement ? generateSummaryMarkdown(session.requirement) : null);
 
   const rawFields: Array<[string, string]> = session.requirement
     ? [
-        ["Project category", formatField(session.requirement.projectCategory)],
         ["Project type", formatField(session.requirement.projectType)],
         ["Purpose / goals", formatField(session.requirement.purposeGoals)],
         ["Target audience", formatField(session.requirement.targetAudience)],
         ["Core features", formatField(session.requirement.coreFeatures)],
         ["Design preferences", formatField(session.requirement.designPrefs)],
         ["User roles", formatField(session.requirement.userRoles)],
-        ["Branding assets", formatField(session.requirement.brandingAssets)],
         ["Tech stack", formatField(session.requirement.techStack)],
         ["Platform type", formatField(session.requirement.platformType)],
-        ["School / adviser requirements", formatField(session.requirement.schoolRequirements)],
         ["Timeline", formatField(session.requirement.timeline)],
         ["Requested timeline (days)", formatField(session.requirement.requestedTimelineDays)],
         ["Budget", formatField(session.requirement.budget)],
+        [
+          "Estimated cost",
+          session.requirement.estimatedCost != null
+            ? `${RATE_CARD.currency}${session.requirement.estimatedCost.toLocaleString("en-US")}`
+            : "—",
+        ],
         ["Additional notes", formatField(session.requirement.additionalNotes)],
       ]
     : [];
@@ -84,15 +90,6 @@ export default async function AdminDetailPage({
         </Card>
       ) : (
         <p className="mb-8 text-sm text-muted">No requirement data yet.</p>
-      )}
-
-      {session.requirement?.quoteMarkdown && (
-        <>
-          <h2 className="mb-3 text-lg text-primary">Quote</h2>
-          <Card className="mb-8 whitespace-pre-wrap text-sm leading-relaxed text-primary">
-            {session.requirement.quoteMarkdown}
-          </Card>
-        </>
       )}
 
       <h2 className="mb-3 text-lg text-primary">Raw fields</h2>

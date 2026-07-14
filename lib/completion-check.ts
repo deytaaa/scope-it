@@ -1,32 +1,23 @@
-const COMMON_REQUIRED_FIELDS = [
-  "projectCategory",
+const REQUIRED_FIELDS = [
   "projectType",
   "purposeGoals",
   "targetAudience",
   "coreFeatures",
+  "platformType",
   "designPrefs",
 ] as const;
 
-const CAPSTONE_REQUIRED_FIELDS = ["platformType", "techStack"] as const;
-const COMMERCIAL_REQUIRED_FIELDS = ["userRoles"] as const;
-
-const COMMON_OPTIONAL_FIELDS = ["brandingAssets", "timeline", "budget"] as const;
-const CAPSTONE_OPTIONAL_FIELDS = ["schoolRequirements"] as const;
+// Deliberately excludes "budget" — that's collected later, together with
+// contact info, once requirements are complete (not gated here).
+const OPTIONAL_BUT_ASK_ONCE = ["timeline", "additionalNotes"] as const;
 
 export const TURN_CAP = 25;
 
 const SKIP_VALUE = "skip";
 
-type CheckableField =
-  | (typeof COMMON_REQUIRED_FIELDS)[number]
-  | (typeof CAPSTONE_REQUIRED_FIELDS)[number]
-  | (typeof COMMERCIAL_REQUIRED_FIELDS)[number]
-  | (typeof COMMON_OPTIONAL_FIELDS)[number]
-  | (typeof CAPSTONE_OPTIONAL_FIELDS)[number];
+type CheckableField = (typeof REQUIRED_FIELDS)[number] | (typeof OPTIONAL_BUT_ASK_ONCE)[number];
 
-export type RequirementFields = Partial<Record<CheckableField, unknown>> & {
-  projectCategory?: string | null;
-};
+export type RequirementFields = Partial<Record<CheckableField, unknown>>;
 
 export type CompletionStatus = "incomplete" | "complete" | "complete-partial";
 
@@ -49,28 +40,12 @@ function isSkipped(value: unknown): boolean {
   return typeof value === "string" && value.trim().toLowerCase() === SKIP_VALUE;
 }
 
-function getRequiredFields(category: string | null | undefined): readonly CheckableField[] {
-  if (category === "capstone") return [...COMMON_REQUIRED_FIELDS, ...CAPSTONE_REQUIRED_FIELDS];
-  if (category === "commercial") return [...COMMON_REQUIRED_FIELDS, ...COMMERCIAL_REQUIRED_FIELDS];
-  // Category itself is the one thing missing from COMMON_REQUIRED_FIELDS, so
-  // this naturally forces it to be asked before any category-specific field.
-  return COMMON_REQUIRED_FIELDS;
-}
-
-function getOptionalFields(category: string | null | undefined): readonly CheckableField[] {
-  if (category === "capstone") return [...COMMON_OPTIONAL_FIELDS, ...CAPSTONE_OPTIONAL_FIELDS];
-  return COMMON_OPTIONAL_FIELDS;
-}
-
 export function checkCompletion(
   requirement: RequirementFields,
   userTurnCount: number
 ): CompletionResult {
-  const requiredFields = getRequiredFields(requirement.projectCategory);
-  const optionalFields = getOptionalFields(requirement.projectCategory);
-
-  const missingRequired = requiredFields.filter((field) => !isFilled(requirement[field]));
-  const missingOptional = optionalFields.filter(
+  const missingRequired = REQUIRED_FIELDS.filter((field) => !isFilled(requirement[field]));
+  const missingOptional = OPTIONAL_BUT_ASK_ONCE.filter(
     (field) => !isFilled(requirement[field]) && !isSkipped(requirement[field])
   );
 

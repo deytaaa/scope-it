@@ -10,7 +10,6 @@ export const RATE_CARD = {
   mobileMultiplier: 0.1,
   rushMultiplier: 0.1,
   rushThresholdDays: 30, // "<1 month" per the rate card this was defined against
-  capstoneDiscount: 0.05,
   daysPerSimpleFeature: 5,
   daysPerComplexFeature: 10, // assumption: proportional to the 2x price of a complex feature
   daysPerUserRole: 2, // assumption: extra role/permission wiring per role
@@ -23,7 +22,6 @@ interface CoreFeatureInput {
 }
 
 export interface QuoteInput {
-  projectCategory?: string | null;
   platformType?: string | null;
   coreFeatures?: unknown; // Requirement.coreFeatures (Json): { name, complexity }[]
   userRoles?: unknown; // Requirement.userRoles (Json): string[]
@@ -102,12 +100,6 @@ export function calculateQuote(input: QuoteInput): QuoteResult {
   if (isRush) {
     const amount = Math.round(cost * RATE_CARD.rushMultiplier);
     breakdown.push({ label: "Rush timeline (+10%)", amount });
-    cost += amount;
-  }
-
-  if (input.projectCategory === "capstone") {
-    const amount = -Math.round(cost * RATE_CARD.capstoneDiscount);
-    breakdown.push({ label: "Capstone discount (-5%)", amount });
     cost += amount;
   }
 

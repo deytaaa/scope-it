@@ -4,22 +4,18 @@ import { prisma } from "@/lib/db";
 import { getNextTurn, type ChatHistoryTurn } from "@/lib/gemini";
 import { checkCompletion, type RequirementFields } from "@/lib/completion-check";
 import type { ExtractedFields } from "@/lib/requirements-schema";
-import { generateSummaryMarkdown } from "@/lib/summary";
+import { generateFinalSummary } from "@/lib/summary";
 import { calculateQuote } from "@/lib/pricing";
-import { generateQuoteMarkdown } from "@/lib/quote";
 import { checkMessageLimit } from "@/lib/rate-limit";
 import { notifySummaryReady } from "@/lib/notify";
 
 const SCALAR_FIELDS = [
-  "projectCategory",
   "projectType",
   "purposeGoals",
   "targetAudience",
   "designPrefs",
-  "brandingAssets",
   "techStack",
   "platformType",
-  "schoolRequirements",
   "requestedTimelineDays",
   "timeline",
   "budget",
@@ -28,7 +24,7 @@ const SCALAR_FIELDS = [
 
 const ARRAY_FIELDS = ["coreFeatures", "userRoles"] as const;
 
-const ACTIVE_STATUSES = ["active", "awaiting_confirmation", "awaiting_contact_info"];
+const ACTIVE_STATUSES = ["active", "awaiting_contact_info"];
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -37,6 +33,12 @@ function hasContent(value: unknown): boolean {
   if (typeof value === "string") return value.trim().length > 0;
   if (Array.isArray(value)) return value.length > 0;
   return true;
+}
+
+function joinWithAnd(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
 }
 
 // Only merges fields the model actually populated with non-empty new info,
@@ -53,11 +55,15 @@ function toRequirementUpdate(fields: ExtractedFields) {
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { sessionId, message } = body as { sessionId?: string; message?: string };
+  const { sessionId: rawSessionId, message } = body as { sessionId?: string; message?: string };
 
-  if (!sessionId || typeof message !== "string" || !message.trim()) {
+  if (!rawSessionId || typeof message !== "string" || !message.trim()) {
     return NextResponse.json({ error: "sessionId and message are required" }, { status: 400 });
   }
+  // Re-bound to a non-optional const: closures below (e.g. finalize) don't
+  // retain narrowing on the original destructured variable across function
+  // boundaries, so this fixes that at the source instead of asserting later.
+  const sessionId: string = rawSessionId;
 
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
@@ -116,98 +122,84 @@ export async function POST(request: Request) {
   let isComplete = false;
   const sessionUpdate: Prisma.SessionUpdateInput = {};
 
-  if (session.status === "awaiting_confirmation" && turn.client_confirmed === true) {
-    // Client confirmed the drafted summary — ask for contact info before finalizing.
-    status = "awaiting_contact_info";
-    assistantContent = `${assistantContent}\n\nGreat! Before I put together your project brief and quote, could I get your name and email so we can send it over?`;
-  } else if (session.status === "awaiting_contact_info") {
+  async function finalize(contactName: string, contactEmail: string) {
+    const quote = calculateQuote({
+      platformType: requirement.platformType,
+      coreFeatures: requirement.coreFeatures,
+      userRoles: requirement.userRoles,
+      requestedTimelineDays: requirement.requestedTimelineDays,
+    });
+    const finalSummary = generateFinalSummary(
+      { name: contactName, email: contactEmail },
+      requirement,
+      quote
+    );
+    assistantContent = `Thank you for sharing all those details! Here's your complete project summary:\n\n${finalSummary}`;
+    status = "complete";
+    isComplete = true;
+
+    await prisma.requirement.update({
+      where: { sessionId },
+      data: {
+        isComplete: true,
+        estimatedCost: quote.estimatedCost,
+        estimatedTimelineDaysMin: quote.estimatedTimelineDaysMin,
+        estimatedTimelineDaysMax: quote.estimatedTimelineDaysMax,
+        summaryMarkdown: finalSummary,
+        pricingBreakdown: quote.breakdown as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    try {
+      await notifySummaryReady(sessionId, requirement.projectType, {
+        name: contactName,
+        email: contactEmail,
+      });
+    } catch (err) {
+      console.error("Failed to send completion notification email:", err);
+    }
+  }
+
+  if (session.status === "awaiting_contact_info") {
     const providedName = turn.extracted_fields.contactName?.trim();
     const providedEmail = turn.extracted_fields.contactEmail?.trim();
     const invalidEmail = providedEmail !== undefined && !EMAIL_PATTERN.test(providedEmail);
 
     const finalName: string | null = providedName || session.contactName;
-    const finalEmail: string | null = (providedEmail && !invalidEmail ? providedEmail : undefined) ?? session.contactEmail;
+    const finalEmail: string | null =
+      (providedEmail && !invalidEmail ? providedEmail : undefined) ?? session.contactEmail;
 
     if (providedName) sessionUpdate.contactName = providedName;
     if (providedEmail && !invalidEmail) sessionUpdate.contactEmail = providedEmail;
 
-    if (finalName && finalEmail) {
-      const quote = calculateQuote({
-        projectCategory: requirement.projectCategory,
-        platformType: requirement.platformType,
-        coreFeatures: requirement.coreFeatures,
-        userRoles: requirement.userRoles,
-        requestedTimelineDays: requirement.requestedTimelineDays,
-      });
-      const quoteMarkdown = generateQuoteMarkdown(requirement, quote);
-      assistantContent = `Thanks, ${finalName}! Here's your project brief and quote:\n\n${quoteMarkdown}`;
-      status = "complete";
-      isComplete = true;
+    const hasBudget = hasContent(requirement.budget);
 
-      await prisma.requirement.update({
-        where: { sessionId },
-        data: {
-          isComplete: true,
-          estimatedCost: quote.estimatedCost,
-          estimatedTimelineDaysMin: quote.estimatedTimelineDaysMin,
-          estimatedTimelineDaysMax: quote.estimatedTimelineDaysMax,
-          quoteMarkdown,
-          pricingBreakdown: quote.breakdown as unknown as Prisma.InputJsonValue,
-        },
-      });
-
-      try {
-        await notifySummaryReady(sessionId, requirement.projectType, {
-          name: finalName,
-          email: finalEmail,
-        });
-      } catch (err) {
-        console.error("Failed to send completion notification email:", err);
-      }
+    if (finalName && finalEmail && hasBudget) {
+      await finalize(finalName, finalEmail);
     } else if (invalidEmail) {
       assistantContent = "That doesn't look like a valid email address — could you double check it?";
       status = "awaiting_contact_info";
     } else {
       // Don't trust the model's own reply here — extraction can silently
-      // drop one of the two fields even when both were clearly provided in
-      // the same message, and its text may claim success prematurely.
-      // Deterministically ask for exactly what's still missing instead.
+      // drop a field even when it was clearly provided, and its text may
+      // claim success prematurely. Deterministically ask for exactly what's
+      // still missing instead.
       status = "awaiting_contact_info";
-      if (!finalName && !finalEmail) {
-        assistantContent = "Could you share your name and email so we can send over the project brief and quote?";
-      } else if (!finalName) {
-        assistantContent = "Thanks! And what name should we use for the project brief?";
-      } else {
-        assistantContent = `Thanks, ${finalName}! What's the best email to send the project brief and quote to?`;
-      }
+      const missing: string[] = [];
+      if (!finalName) missing.push("your full name");
+      if (!finalEmail) missing.push("your email address");
+      if (!hasBudget) missing.push("your estimated budget");
+      assistantContent = `Thanks! Could you also share ${joinWithAnd(missing)}?`;
     }
   } else {
-    // Either still gathering info, or the client asked for a change while
-    // awaiting confirmation — either way, re-evaluate completeness against
-    // the just-updated requirement (a correction can immediately re-satisfy
-    // completeness and re-draft the summary in this same turn).
     const userTurnCount = await prisma.message.count({ where: { sessionId, role: "user" } });
     const completion = checkCompletion(requirement as unknown as RequirementFields, userTurnCount + 1);
 
     if (completion.status === "complete") {
-      const summaryMarkdown = generateSummaryMarkdown(requirement);
-      assistantContent = `${assistantContent}\n\n---\n\nHere's what I've got so far:\n\n${summaryMarkdown}\n\nDoes this look correct? Reply "yes" to confirm, or let me know what needs to change.`;
-      status = "awaiting_confirmation";
-      await prisma.requirement.update({ where: { sessionId }, data: { summaryMarkdown } });
+      assistantContent = `${assistantContent}\n\nGreat, I think I have a solid understanding of your project! Before I put together your full summary and cost estimate, could you share your full name, email address, and your estimated budget?`;
+      status = "awaiting_contact_info";
     } else if (completion.status === "complete-partial") {
-      const summaryMarkdown = generateSummaryMarkdown(requirement);
-      status = "complete-partial";
-      isComplete = true;
-      await prisma.requirement.update({
-        where: { sessionId },
-        data: { isComplete: true, summaryMarkdown },
-      });
-
-      try {
-        await notifySummaryReady(sessionId, requirement.projectType);
-      } catch (err) {
-        console.error("Failed to send completion notification email:", err);
-      }
+      await finalize(session.contactName ?? "Not provided", session.contactEmail ?? "Not provided");
     } else {
       status = "active";
     }

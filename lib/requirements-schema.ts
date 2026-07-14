@@ -8,11 +8,6 @@ export const requirementsResponseSchema = {
     extracted_fields: {
       type: Type.OBJECT,
       properties: {
-        projectCategory: {
-          type: Type.STRING,
-          format: "enum",
-          enum: ["capstone", "commercial"],
-        },
         projectType: { type: Type.STRING },
         purposeGoals: { type: Type.STRING },
         targetAudience: { type: Type.STRING },
@@ -32,14 +27,12 @@ export const requirementsResponseSchema = {
           },
         },
         designPrefs: { type: Type.STRING },
-        brandingAssets: { type: Type.STRING },
         techStack: { type: Type.STRING },
         platformType: {
           type: Type.STRING,
           format: "enum",
           enum: ["web", "mobile", "desktop"],
         },
-        schoolRequirements: { type: Type.STRING },
         userRoles: { type: Type.ARRAY, items: { type: Type.STRING } },
         requestedTimelineDays: { type: Type.INTEGER },
         timeline: { type: Type.STRING },
@@ -49,10 +42,8 @@ export const requirementsResponseSchema = {
         contactEmail: { type: Type.STRING },
       },
     },
-    model_thinks_complete: { type: Type.BOOLEAN },
-    client_confirmed: { type: Type.BOOLEAN },
   },
-  required: ["reply_to_user", "extracted_fields", "model_thinks_complete"],
+  required: ["reply_to_user", "extracted_fields"],
 };
 
 export interface CoreFeature {
@@ -61,16 +52,13 @@ export interface CoreFeature {
 }
 
 export interface ExtractedFields {
-  projectCategory?: "capstone" | "commercial";
   projectType?: string;
   purposeGoals?: string;
   targetAudience?: string;
   coreFeatures?: CoreFeature[];
   designPrefs?: string;
-  brandingAssets?: string;
   techStack?: string;
   platformType?: "web" | "mobile" | "desktop";
-  schoolRequirements?: string;
   userRoles?: string[];
   requestedTimelineDays?: number;
   timeline?: string;
@@ -84,6 +72,4 @@ export interface GeminiTurnResponse {
   reply_to_user: string;
   next_question?: string;
   extracted_fields: ExtractedFields;
-  model_thinks_complete: boolean;
-  client_confirmed?: boolean;
 }
