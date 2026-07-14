@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
+import { KineticGrid } from "@/components/ui/KineticGrid";
 import "../styles/globals.css";
 
 const jetbrainsMono = JetBrains_Mono({
@@ -33,7 +34,10 @@ export default function RootLayout({
           {THEME_INIT_SCRIPT}
         </Script>
       </head>
-      <body>{children}</body>
+      <body>
+        <KineticGrid />
+        <div className="relative z-10">{children}</div>
+      </body>
     </html>
   );
 }
