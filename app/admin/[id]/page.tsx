@@ -98,7 +98,7 @@ export default async function AdminDetailPage({
         {rawFields.map(([label, value]) => (
           <div key={label}>
             <p className="m-0 mb-1 text-xs text-secondary">{label}</p>
-            <p className="m-0 text-sm text-primary">{value}</p>
+            <p className="m-0 break-words text-sm text-primary">{value}</p>
           </div>
         ))}
       </Card>
