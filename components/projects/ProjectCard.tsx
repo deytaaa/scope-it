@@ -7,9 +7,9 @@ export function ProjectCard({ project, onOpen }: { project: Project; onOpen: () 
     <button
       type="button"
       onClick={onOpen}
-      className="project-card group flex flex-col overflow-hidden rounded-card border-[0.5px] border-border bg-card text-left"
+      className="project-card group flex h-full flex-col overflow-hidden rounded-card border-[0.5px] border-border bg-card text-left"
     >
-      <div className="relative h-44 w-full overflow-hidden bg-chrome">
+      <div className="relative h-44 w-full shrink-0 overflow-hidden bg-chrome">
         <Image
           src={project.image}
           alt={project.title}
@@ -20,10 +20,17 @@ export function ProjectCard({ project, onOpen }: { project: Project; onOpen: () 
       </div>
       <div className="flex flex-1 flex-col gap-3 px-4 py-4">
         <div>
-          <p className="m-0 mb-1 text-sm text-primary">{project.title}</p>
-          <p className="m-0 text-[13px] leading-relaxed text-secondary">{project.description}</p>
+          {/* min-h + line-clamp reserve the same space whether a title/description
+              is one line or wraps to the max — otherwise cards with shorter text
+              end up shorter than their neighbors even with h-full on the card. */}
+          <p className="m-0 mb-1 line-clamp-2 min-h-[2.5rem] text-sm leading-tight text-primary">
+            {project.title}
+          </p>
+          <p className="m-0 line-clamp-2 min-h-[2.75rem] text-[13px] leading-relaxed text-secondary">
+            {project.description}
+          </p>
         </div>
-        <div className="mt-auto flex flex-wrap gap-1.5">
+        <div className="mt-auto flex h-14 flex-wrap content-start gap-1.5 overflow-hidden">
           {project.techStack.map((tech) => (
             <Badge key={tech}>{tech}</Badge>
           ))}

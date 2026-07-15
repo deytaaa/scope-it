@@ -14,7 +14,7 @@ export function ProjectsGrid({ projects }: { projects: Project[] }) {
         {projects.map((project, i) => (
           <div
             key={project.slug}
-            className="animate-fade-in-up"
+            className="animate-fade-in-up h-full"
             style={{ animationDelay: `${i * 60}ms` }}
           >
             <ProjectCard project={project} onOpen={() => setActiveProject(project)} />
