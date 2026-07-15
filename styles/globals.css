@@ -60,11 +60,30 @@ body {
   animation: fade-in-up 0.5s ease-out both;
 }
 
+@keyframes float-subtle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Fades in once, then floats continuously — the float's own delay lets the
+   fade-in finish first so the two don't visually fight each other. */
+.animate-fade-in-float {
+  animation: fade-in-up 0.5s ease-out both, float-subtle 6s ease-in-out 0.6s infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   body {
     transition: none;
   }
   .animate-fade-in-up {
+    animation: none;
+  }
+  .animate-fade-in-float {
     animation: none;
   }
 }
