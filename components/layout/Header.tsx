@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ThemeToggle } from "./ThemeToggle";
+import { MobileNav } from "./MobileNav";
 
 export function Header() {
   return (
@@ -8,7 +9,7 @@ export function Header() {
         <Link href="/" className="font-mono text-sm text-primary transition-colors duration-150">
           ScopeAI
         </Link>
-        <nav className="flex items-center gap-6">
+        <nav className="hidden items-center gap-6 md:flex">
           <Link
             href="/projects"
             className="text-sm text-secondary transition-colors duration-150 hover:text-primary"
@@ -23,6 +24,9 @@ export function Header() {
           </Link>
           <ThemeToggle />
         </nav>
+        <div className="md:hidden">
+          <MobileNav />
+        </div>
       </div>
     </header>
   );

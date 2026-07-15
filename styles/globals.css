@@ -139,6 +139,31 @@ body {
   transform: scale(0.96) translateY(4px);
 }
 
+/* Mobile nav dropdown — same @starting-style + data-closing pattern as the
+   project modal above, for the same reason (see there). */
+.mobile-nav-panel {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transform-origin: top right;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+@starting-style {
+  .mobile-nav-panel {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+
+.mobile-nav-panel[data-closing="true"] {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+}
+
+.hamburger-line {
+  transition: transform 200ms ease, opacity 200ms ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
   body {
     transition: none;
@@ -157,6 +182,10 @@ body {
   }
   .project-modal-backdrop,
   .project-modal-panel {
+    transition: none;
+  }
+  .mobile-nav-panel,
+  .hamburger-line {
     transition: none;
   }
 }
