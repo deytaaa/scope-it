@@ -47,7 +47,8 @@ export const projects: Project[] = [
     ],
     role: "Full Stack Developer responsible for database design, API integration, and crafting a responsive frontend user interface.",
     challenges: "Ensuring secure and structured data access so that different student organizations can only manage their respective event listings and directories without interfering with others.",
-    solutions: "Implemented robust Row-Level Security (RLS) policies in Supabase coupled with Next.js middleware to strictly enforce role-based access control."
+    solutions: "Implemented robust Row-Level Security (RLS) policies in Supabase coupled with Next.js middleware to strictly enforce role-based access control.",
+    videoUrl: "/projects/DEMO/CESSCADemo.mp4"
   },
   {
     slug: "ducksitet",
@@ -64,7 +65,9 @@ export const projects: Project[] = [
     ],
     role: "Lead Full Stack Developer in charge of designing the database architecture, managing state transitions for the quizzes, and designing the responsive gamified UI.",
     challenges: "Handling real-time state management for quiz timers and scoring, ensuring that page reloads or minor disruptions do not corrupt the student's quiz session or leaderboard score submissions.",
-    solutions: "Utilized local state persistence alongside Supabase transactions to reliably process and lock in final quiz scores once completed."
+    solutions: "Utilized local state persistence alongside Supabase transactions to reliably process and lock in final quiz scores once completed.",
+    videoUrl: "/projects/DEMO/DucksiteTDemo.mp4"
+
   },
   {
     slug: "inventory-system",
@@ -117,6 +120,7 @@ export const projects: Project[] = [
     ],
     role: "Lead Developer responsible for translating administrative tracking requirements into a clean, easy-to-use digital application with comprehensive report generation features.",
     challenges: "Creating a highly intuitive user interface that can easily be navigated by barangay staff and citizens of all ages, including those who are not digitally savvy.",
-    solutions: "Focused on clean typography, large click targets, minimal input requirements, and clear step-by-step visual prompts to guide users through the registration process."
-  }
+    solutions: "Focused on clean typography, large click targets, minimal input requirements, and clear step-by-step visual prompts to guide users through the registration process.",
+    videoUrl: "/projects/DEMO/SmartendanceDemo.mp4"
+  } 
 ];
