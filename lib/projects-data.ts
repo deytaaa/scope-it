@@ -81,7 +81,8 @@ export const projects: Project[] = [
     ],
     role: "Full Stack Developer tasked with building the schema relation models, developing the CRUD operations, and designing the admin control panel.",
     challenges: "Syncing inventory stock counts accurately during simultaneous operations, such as when a job order deducts items from the warehouse in real-time while a physical audit is ongoing.",
-    solutions: "Implemented database-level triggers and transaction rollbacks to maintain strict inventory integrity, ensuring that stock levels never desynchronize."
+    solutions: "Implemented database-level triggers and transaction rollbacks to maintain strict inventory integrity, ensuring that stock levels never desynchronize.",
+    videoUrl: "/projects/DEMO/InventoryAndJobOrderSystemDemo.mp4"
   },
   {
     slug: "rfid",
@@ -98,7 +99,8 @@ export const projects: Project[] = [
     ],
     role: "Hardware-to-Software Integration Developer and Backend Engineer in charge of setting up the Node.js event listener and data ingestion flow.",
     challenges: "Achieving near-zero latency when streaming scanned RFID badge data from physical readers directly to the web application monitor.",
-    solutions: "Implemented WebSockets to establish a persistent, bidirectional connection, enabling real-time visual updates on the administrator dashboard the exact millisecond a card is tapped."
+    solutions: "Implemented WebSockets to establish a persistent, bidirectional connection, enabling real-time visual updates on the administrator dashboard the exact millisecond a card is tapped.",
+    videoUrl: "/projects/DEMO/RFIDStudentMonitoringSystemDemo.mp4"
   },
   {
     slug: "smart-attendance",
