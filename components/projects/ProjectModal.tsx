@@ -24,27 +24,32 @@ export function ProjectModal({ project, onClose }: { project: Project | null; on
   // Stays mounted for TRANSITION_MS after `project` goes null, so the closing
   // animation has something to animate rather than the panel just vanishing.
   const [renderedProject, setRenderedProject] = useState<Project | null>(null);
-  const [visible, setVisible] = useState(false);
   const [prevProject, setPrevProject] = useState<Project | null>(null);
 
   // Adjusts state during render when `project` changes, rather than a
-  // synchronous setState inside the effect below. Resets to the closed frame
-  // either way — opening mounts renderedProject immediately (in that closed
-  // frame) so the effect's rAF has something to transition from; closing just
-  // needs visible back to false so the panel animates out before it unmounts.
+  // synchronous setState inside the effect below — mounts renderedProject
+  // immediately on open. The enter animation itself is handled by CSS
+  // @starting-style (see .project-modal-backdrop/-panel in globals.css), not
+  // JS: an earlier version flipped a `visible` flag to true via
+  // requestAnimationFrame after mount, but that raced the browser's paint on
+  // the very first open — rAF fires before the browser's next paint, so if
+  // React's render and the rAF callback both landed before that paint,
+  // "closed" and "open" could collapse into a single frame and the modal
+  // would silently fail to open. @starting-style needs no such timing at all.
   if (project !== prevProject) {
     setPrevProject(project);
-    setVisible(false);
     if (project) {
       setRenderedProject(project);
     }
   }
 
+  // True only during the closing grace period (project just went null, but
+  // renderedProject hasn't caught up yet) — applies the closed visual state
+  // so the CSS transition animates out before the timeout below unmounts it.
+  const closing = !project && !!renderedProject;
+
   useEffect(() => {
-    if (project) {
-      const raf = requestAnimationFrame(() => setVisible(true));
-      return () => cancelAnimationFrame(raf);
-    }
+    if (project) return;
     const timeout = setTimeout(() => setRenderedProject(null), TRANSITION_MS);
     return () => clearTimeout(timeout);
   }, [project]);
@@ -71,10 +76,10 @@ export function ProjectModal({ project, onClose }: { project: Project | null; on
   const p = renderedProject;
 
   return (
-    <div className="project-modal-backdrop" data-visible={visible} onClick={onClose}>
+    <div className="project-modal-backdrop" data-closing={closing} onClick={onClose}>
       <div
         className="project-modal-panel max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-card border-[0.5px] border-border bg-card"
-        data-visible={visible}
+        data-closing={closing}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

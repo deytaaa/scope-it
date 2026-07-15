@@ -87,9 +87,14 @@ body {
   box-shadow: 0 12px 30px color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
-/* Project detail modal — driven by data-visible (set a frame after mount, and
-   removed a beat before unmount) rather than Tailwind's opacity modifiers, so
-   entrance/exit both get a real transition instead of an instant cut. */
+/* Project detail modal. Entrance uses native @starting-style rather than a
+   JS-driven "flip to visible after mount" step — the browser handles
+   animating from the inserted state on its own, with no race against paint
+   timing (a requestAnimationFrame-based version of this used to lose that
+   race intermittently on the very first open of a session). Exit still needs
+   JS: @starting-style has no equivalent for unmounting, so [data-closing]
+   applies the closed state for one beat before the component removes itself
+   (see the setTimeout in ProjectModal.tsx). */
 .project-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -102,23 +107,36 @@ body {
   background: color-mix(in srgb, var(--bg-page) 75%, transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  opacity: 0;
+  opacity: 1;
   transition: opacity 200ms ease;
 }
 
-.project-modal-backdrop[data-visible="true"] {
-  opacity: 1;
+@starting-style {
+  .project-modal-backdrop {
+    opacity: 0;
+  }
+}
+
+.project-modal-backdrop[data-closing="true"] {
+  opacity: 0;
 }
 
 .project-modal-panel {
-  opacity: 0;
-  transform: scale(0.96) translateY(4px);
+  opacity: 1;
+  transform: scale(1) translateY(0);
   transition: opacity 200ms ease, transform 200ms ease;
 }
 
-.project-modal-panel[data-visible="true"] {
-  opacity: 1;
-  transform: scale(1) translateY(0);
+@starting-style {
+  .project-modal-panel {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+}
+
+.project-modal-panel[data-closing="true"] {
+  opacity: 0;
+  transform: scale(0.96) translateY(4px);
 }
 
 @media (prefers-reduced-motion: reduce) {
