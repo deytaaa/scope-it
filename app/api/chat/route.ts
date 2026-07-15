@@ -55,6 +55,15 @@ const DECLINE_PATTERN = /^(none|no|nope|nah|n\/a|na|nothing|nothing else|nothing
 // the reply was misleading — it read as a finished, conclusive turn.
 const PREMATURE_CONTACT_PATTERN = /\b(email address|full name|estimated budget|target budget|your budget)\b/i;
 
+// Loosely matches anything that could plausibly be a budget answer (a number,
+// a spelled-out number word, or currency vocabulary). Unlike email, budget is
+// free text with no fixed format to validate against, so this is intentionally
+// permissive — it's only used as a last resort (see below) once name and
+// email are already confirmed and budget is the one remaining field, at which
+// point there's nothing else the client's reply could reasonably be about.
+const BUDGET_HINT_PATTERN =
+  /\d|thousand|hundred|million|grand|peso|php|dollar|budget|\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/i;
+
 // Fallback question for whichever field checkCompletion still lists as
 // missing, used when the model itself produced no next_question (see below).
 const FIELD_PROMPTS: Record<string, string> = {
@@ -155,6 +164,20 @@ export async function POST(request: Request) {
 
   const requirementUpdate = toRequirementUpdate(turn.extracted_fields);
 
+  // Requirement fields are considered closed once the contact-info step
+  // begins — the model's own prompt says its only job there is
+  // contactName/contactEmail/budget, but it has been observed writing to
+  // other fields anyway (e.g. overwriting an already-correct targetAudience
+  // with the client's email address, on the very turn that provided it).
+  // contactName/contactEmail are handled separately via sessionUpdate below,
+  // so budget is the only Requirement-table field this step should ever
+  // touch; strip everything else regardless of what the model returned.
+  if (session.status === "awaiting_contact_info") {
+    for (const key of Object.keys(requirementUpdate)) {
+      if (key !== "budget") delete requirementUpdate[key];
+    }
+  }
+
   if (session.status === "active" && DECLINE_PATTERN.test(message.trim())) {
     const merged: Record<string, unknown> = {
       ...(session.requirement as unknown as Record<string, unknown> | null),
@@ -240,9 +263,36 @@ export async function POST(request: Request) {
     if (providedName) sessionUpdate.contactName = providedName;
     if (providedEmail && !invalidEmail) sessionUpdate.contactEmail = providedEmail;
 
-    const hasBudget = hasContent(requirement.budget);
+    // Same reliability gap as email used to have, but worse in practice:
+    // budget is free text with nothing to regex-validate, so the model has to
+    // get the extraction right on its own — and observed in production, it
+    // repeatedly failed to on trivially simple replies ("1000", "One
+    // thousand"), leaving the client stuck being asked the same question in
+    // a loop with no way out. Gated specifically to name/email having been
+    // confirmed in an *earlier* turn (session.contactName/Email, not
+    // finalName/finalEmail — which would also be true on the very turn that
+    // first provides them, wrongly treating "my email is x1@y.com" itself as
+    // a budget answer just because it contains a digit). Only once this
+    // message is a dedicated follow-up with nothing else being asked is there
+    // nothing else the client's reply could reasonably be about — so if it
+    // looks at all budget-like, use the raw message as the answer rather than
+    // trusting extraction alone.
+    let budgetFallback: string | undefined;
+    if (
+      !hasContent(requirement.budget) &&
+      session.contactName &&
+      session.contactEmail &&
+      BUDGET_HINT_PATTERN.test(message)
+    ) {
+      budgetFallback = message.trim();
+    }
+    const hasBudget = hasContent(requirement.budget) || !!budgetFallback;
 
     if (finalName && finalEmail && hasBudget) {
+      if (budgetFallback) {
+        await prisma.requirement.update({ where: { sessionId }, data: { budget: budgetFallback } });
+        requirement.budget = budgetFallback;
+      }
       await finalize(finalName, finalEmail);
     } else if (invalidEmail) {
       assistantContent = "That doesn't look like a valid email address — could you double check it?";
