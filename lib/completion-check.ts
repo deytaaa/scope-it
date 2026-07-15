@@ -9,7 +9,7 @@ const REQUIRED_FIELDS = [
 
 // Deliberately excludes "budget" — that's collected later, together with
 // contact info, once requirements are complete (not gated here).
-const OPTIONAL_BUT_ASK_ONCE = ["timeline", "additionalNotes"] as const;
+export const OPTIONAL_BUT_ASK_ONCE = ["timeline", "additionalNotes"] as const;
 
 export const TURN_CAP = 25;
 

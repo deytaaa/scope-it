@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getNextTurn, type ChatHistoryTurn } from "@/lib/gemini";
-import { checkCompletion, type RequirementFields } from "@/lib/completion-check";
+import { checkCompletion, OPTIONAL_BUT_ASK_ONCE, type RequirementFields } from "@/lib/completion-check";
 import type { ExtractedFields } from "@/lib/requirements-schema";
 import { generateFinalSummary } from "@/lib/summary";
 import { calculateQuote } from "@/lib/pricing";
@@ -34,6 +34,27 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Unanchored variant of EMAIL_PATTERN, for finding an email inside a free-text
 // message rather than validating a whole string against it.
 const EMAIL_SEARCH_PATTERN = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+
+// A short, unambiguous "no more" reply — used as a fallback when the model
+// fails to write the required "skip" sentinel for an optional field it just
+// asked about (observed in production: the client replied "None." to being
+// asked about additional requirements, and the model left additionalNotes
+// empty instead of writing "skip", which stalled the conversation because
+// completion-check.ts correctly kept waiting on that field forever).
+const DECLINE_PATTERN = /^(none|no|nope|nah|n\/a|na|nothing|nothing else|nothing more|no more|not really|that'?s (it|all)|that is (it|all))[.!]*$/i;
+
+// Fallback question for whichever field checkCompletion still lists as
+// missing, used when the model itself produced no next_question (see below).
+const FIELD_PROMPTS: Record<string, string> = {
+  projectType: "What type of project is this?",
+  purposeGoals: "What's the main purpose or goal of the project?",
+  targetAudience: "Who will be using this system, and in what capacity?",
+  coreFeatures: "What core features or functionality does it need?",
+  platformType: "Will this be a web, mobile, or desktop application?",
+  designPrefs: "Do you have any design preferences for how it should look and feel?",
+  timeline: "Do you have a timeline in mind for this project, or should we skip that?",
+  additionalNotes: "Is there anything else you'd like to add, or should we move on?",
+};
 
 function hasContent(value: unknown): boolean {
   if (value === undefined || value === null) return false;
@@ -121,6 +142,21 @@ export async function POST(request: Request) {
   }
 
   const requirementUpdate = toRequirementUpdate(turn.extracted_fields);
+
+  if (session.status === "active" && DECLINE_PATTERN.test(message.trim())) {
+    const merged: Record<string, unknown> = {
+      ...(session.requirement as unknown as Record<string, unknown> | null),
+      ...requirementUpdate,
+    };
+    const stillOpen = OPTIONAL_BUT_ASK_ONCE.filter((field) => !hasContent(merged[field]));
+    // Only act when exactly one optional field is still open — if both are,
+    // it's ambiguous which one the client is declining, so leave it to the
+    // model/normal flow rather than risk marking the wrong field "skip".
+    if (stillOpen.length === 1) {
+      requirementUpdate[stillOpen[0]] = "skip";
+    }
+  }
+
   const requirement = await prisma.requirement.upsert({
     where: { sessionId },
     create: { sessionId, ...requirementUpdate },
@@ -222,6 +258,19 @@ export async function POST(request: Request) {
       await finalize(session.contactName ?? "Not provided", session.contactEmail ?? "Not provided");
     } else {
       status = "active";
+      // The model occasionally believes it has nothing left to ask (empty
+      // next_question) even though the backend checklist says otherwise —
+      // observed in production: targetAudience was never actually captured,
+      // but the model's reply sounded conclusive with no follow-up, making
+      // the conversation look finished when it wasn't. Never trust that
+      // silence; deterministically ask about whatever's still missing.
+      if (!turn.next_question?.trim()) {
+        const nextField = completion.missingRequired[0] ?? completion.missingOptional[0];
+        const fallbackQuestion = nextField ? FIELD_PROMPTS[nextField] : undefined;
+        if (fallbackQuestion) {
+          assistantContent = `${turn.reply_to_user}\n\n${fallbackQuestion}`;
+        }
+      }
     }
   }
 
