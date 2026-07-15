@@ -30,10 +30,14 @@ const ARRAY_FIELDS = Object.keys(ARRAY_FIELD_CAPS) as (keyof typeof ARRAY_FIELD_
 
 const ACTIVE_STATUSES = ["active", "awaiting_contact_info"];
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Restricted to standard email characters (rather than "anything but
+// whitespace/@") specifically so the TLD segment can't swallow trailing
+// sentence punctuation — observed in production: "my email is x@y.com, and
+// my budget..." matched through the comma, saving "x@y.com," to the DB.
+const EMAIL_PATTERN = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 // Unanchored variant of EMAIL_PATTERN, for finding an email inside a free-text
 // message rather than validating a whole string against it.
-const EMAIL_SEARCH_PATTERN = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+const EMAIL_SEARCH_PATTERN = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
 
 // A short, unambiguous "no more" reply — used as a fallback when the model
 // fails to write the required "skip" sentinel for an optional field it just
@@ -42,6 +46,14 @@ const EMAIL_SEARCH_PATTERN = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 // empty instead of writing "skip", which stalled the conversation because
 // completion-check.ts correctly kept waiting on that field forever).
 const DECLINE_PATTERN = /^(none|no|nope|nah|n\/a|na|nothing|nothing else|nothing more|no more|not really|that'?s (it|all)|that is (it|all))[.!]*$/i;
+
+// Catches the model preempting the contact-info step itself — forbidden by
+// its own system prompt, but observed in production: with a required field
+// (targetAudience) still missing, the model still asked "could you provide
+// your full name, email address, and your target budget" directly in its own
+// text. status correctly stayed "active" (the backend didn't transition), but
+// the reply was misleading — it read as a finished, conclusive turn.
+const PREMATURE_CONTACT_PATTERN = /\b(email address|full name|estimated budget|target budget|your budget)\b/i;
 
 // Fallback question for whichever field checkCompletion still lists as
 // missing, used when the model itself produced no next_question (see below).
@@ -252,19 +264,33 @@ export async function POST(request: Request) {
     const completion = checkCompletion(requirement as unknown as RequirementFields, userTurnCount + 1);
 
     if (completion.status === "complete") {
-      assistantContent = `${assistantContent}\n\nGreat, I think I have a solid understanding of your project! Before I put together your full summary and cost estimate, could you share your full name, email address, and your estimated budget?`;
+      // Built from turn.reply_to_user directly, not assistantContent — the
+      // model's own next_question (if any) is dropped rather than appended,
+      // since the system is taking over the flow now. Observed in production:
+      // keeping it produced a confusing reply with two different questions
+      // back to back, one of which the system was about to ignore anyway.
+      assistantContent = `${turn.reply_to_user}\n\nGreat, I think I have a solid understanding of your project! Before I put together your full summary and cost estimate, could you share your full name, email address, and your estimated budget?`;
       status = "awaiting_contact_info";
     } else if (completion.status === "complete-partial") {
       await finalize(session.contactName ?? "Not provided", session.contactEmail ?? "Not provided");
     } else {
       status = "active";
-      // The model occasionally believes it has nothing left to ask (empty
-      // next_question) even though the backend checklist says otherwise —
-      // observed in production: targetAudience was never actually captured,
-      // but the model's reply sounded conclusive with no follow-up, making
-      // the conversation look finished when it wasn't. Never trust that
-      // silence; deterministically ask about whatever's still missing.
-      if (!turn.next_question?.trim()) {
+      // The model's own next_question can't be trusted here in two ways:
+      // it's sometimes empty (the model believes it's done even though a
+      // required field is missing), and sometimes non-empty but wrong (the
+      // model preempts the contact-info step itself, which its own prompt
+      // forbids). Either way, the reply reads as conclusive when the backend
+      // checklist says the conversation isn't. Fall back to deterministically
+      // asking about whatever's actually still missing.
+      // Reuses DECLINE_PATTERN: the model sometimes writes a literal "none"
+      // (or similar) into next_question instead of actually leaving it empty
+      // — same meaningless-placeholder shape either way, so treat it the same.
+      const trimmedQuestion = turn.next_question?.trim();
+      const noQuestion = !trimmedQuestion || DECLINE_PATTERN.test(trimmedQuestion);
+      const askedForContactEarly =
+        PREMATURE_CONTACT_PATTERN.test(turn.next_question ?? "") ||
+        PREMATURE_CONTACT_PATTERN.test(turn.reply_to_user);
+      if (noQuestion || askedForContactEarly) {
         const nextField = completion.missingRequired[0] ?? completion.missingOptional[0];
         const fallbackQuestion = nextField ? FIELD_PROMPTS[nextField] : undefined;
         if (fallbackQuestion) {
