@@ -75,7 +75,12 @@ export function ChatWindow({ sessionId, initialMessages = [], initialStatus = "a
           <p className="text-sm text-muted">Tell us about the project you have in mind to get started.</p>
         )}
         {messages.map((message, i) => (
-          <MessageBubble key={i} role={message.role} content={message.content} />
+          <MessageBubble
+            key={i}
+            role={message.role}
+            content={message.content}
+            showCopyButton={isComplete && message.role === "assistant" && i === messages.length - 1}
+          />
         ))}
         {isLoading && <p className="text-sm text-muted">Thinking…</p>}
         <div ref={bottomRef} />
