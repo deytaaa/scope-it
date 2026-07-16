@@ -198,7 +198,17 @@ export async function POST(request: Request) {
     update: requirementUpdate,
   });
 
-  let assistantContent = turn.next_question
+  // The model occasionally writes the same question into both reply_to_user
+  // and next_question despite the prompt saying not to (observed in
+  // production: the client would see the exact same question twice in one
+  // message, back to back). Prompt now says this explicitly, but don't rely
+  // on that alone — skip appending next_question if reply_to_user already
+  // contains it.
+  const questionAlreadyInReply =
+    !!turn.next_question &&
+    turn.reply_to_user.toLowerCase().includes(turn.next_question.trim().toLowerCase());
+
+  let assistantContent = turn.next_question && !questionAlreadyInReply
     ? `${turn.reply_to_user}\n\n${turn.next_question}`
     : turn.reply_to_user;
 

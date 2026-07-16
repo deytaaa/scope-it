@@ -1,7 +1,9 @@
 import type { Requirement } from "@prisma/client";
 import { RATE_CARD, type QuoteResult } from "./pricing";
+import { isSkipped } from "./completion-check";
 
 const FALLBACK = "_Not specified_";
+const SKIPPED_LABEL = "_Skipped by client_";
 
 interface CoreFeatureLike {
   name?: string;
@@ -61,7 +63,7 @@ export function generateSummaryMarkdown(requirement: Requirement): string {
   sections.push(`## Technical requirements\n${techLines.length ? techLines.join("\n") : FALLBACK}`);
 
   if (requirement.timeline && requirement.timeline.trim()) {
-    sections.push(`## Timeline\n${requirement.timeline.trim()}`);
+    sections.push(`## Timeline\n${isSkipped(requirement.timeline) ? SKIPPED_LABEL : requirement.timeline.trim()}`);
   }
 
   if (requirement.budget && requirement.budget.trim()) {
@@ -69,7 +71,9 @@ export function generateSummaryMarkdown(requirement: Requirement): string {
   }
 
   if (requirement.additionalNotes && requirement.additionalNotes.trim()) {
-    sections.push(`## Additional notes\n${requirement.additionalNotes.trim()}`);
+    sections.push(
+      `## Additional notes\n${isSkipped(requirement.additionalNotes) ? SKIPPED_LABEL : requirement.additionalNotes.trim()}`
+    );
   }
 
   return sections.join("\n\n") + "\n";
@@ -100,11 +104,11 @@ export function generateFinalSummary(
   ].filter(Boolean);
 
   const additionalLines = [
-    requirement.timeline && requirement.timeline.trim()
+    requirement.timeline && requirement.timeline.trim() && !isSkipped(requirement.timeline)
       ? `Timeline: ${requirement.timeline.trim()}`
       : null,
     requirement.designPrefs ? `Design preferences: ${formatText(requirement.designPrefs as string | null)}` : null,
-    requirement.additionalNotes && requirement.additionalNotes.trim()
+    requirement.additionalNotes && requirement.additionalNotes.trim() && !isSkipped(requirement.additionalNotes)
       ? requirement.additionalNotes.trim()
       : null,
   ].filter(Boolean);

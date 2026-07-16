@@ -36,7 +36,10 @@ function isFilled(value: unknown): boolean {
   return true;
 }
 
-function isSkipped(value: unknown): boolean {
+// Exported for reuse in lib/summary.ts — the "skip" sentinel is an internal
+// signal that a client explicitly declined an optional field, not something
+// that should ever be shown to the client themselves in the final summary.
+export function isSkipped(value: unknown): boolean {
   return typeof value === "string" && value.trim().toLowerCase() === SKIP_VALUE;
 }
 
