@@ -28,7 +28,7 @@ const SCALAR_FIELDS = [
 const ARRAY_FIELD_CAPS = { coreFeatures: 40, userRoles: 15 } as const;
 const ARRAY_FIELDS = Object.keys(ARRAY_FIELD_CAPS) as (keyof typeof ARRAY_FIELD_CAPS)[];
 
-const ACTIVE_STATUSES = ["active", "awaiting_contact_info"];
+const ACTIVE_STATUSES = ["active", "awaiting_contact_info", "awaiting_budget"];
 
 // Restricted to standard email characters (rather than "anything but
 // whitespace/@") specifically so the TLD segment can't swallow trailing
@@ -54,15 +54,6 @@ const DECLINE_PATTERN = /^(none|no|nope|nah|n\/a|na|nothing|nothing else|nothing
 // text. status correctly stayed "active" (the backend didn't transition), but
 // the reply was misleading — it read as a finished, conclusive turn.
 const PREMATURE_CONTACT_PATTERN = /\b(email address|full name|estimated budget|target budget|your budget)\b/i;
-
-// Loosely matches anything that could plausibly be a budget answer (a number,
-// a spelled-out number word, or currency vocabulary). Unlike email, budget is
-// free text with no fixed format to validate against, so this is intentionally
-// permissive — it's only used as a last resort (see below) once name and
-// email are already confirmed and budget is the one remaining field, at which
-// point there's nothing else the client's reply could reasonably be about.
-const BUDGET_HINT_PATTERN =
-  /\d|thousand|hundred|million|grand|peso|php|dollar|budget|\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/i;
 
 // Fallback question for whichever field checkCompletion still lists as
 // missing, used when the model itself produced no next_question (see below).
@@ -164,15 +155,15 @@ export async function POST(request: Request) {
 
   const requirementUpdate = toRequirementUpdate(turn.extracted_fields);
 
-  // Requirement fields are considered closed once the contact-info step
-  // begins — the model's own prompt says its only job there is
+  // Requirement fields are considered closed once the contact/budget steps
+  // begin — the model's own prompt says its only job there is
   // contactName/contactEmail/budget, but it has been observed writing to
   // other fields anyway (e.g. overwriting an already-correct targetAudience
   // with the client's email address, on the very turn that provided it).
   // contactName/contactEmail are handled separately via sessionUpdate below,
-  // so budget is the only Requirement-table field this step should ever
+  // so budget is the only Requirement-table field either step should ever
   // touch; strip everything else regardless of what the model returned.
-  if (session.status === "awaiting_contact_info") {
+  if (session.status === "awaiting_contact_info" || session.status === "awaiting_budget") {
     for (const key of Object.keys(requirementUpdate)) {
       if (key !== "budget") delete requirementUpdate[key];
     }
@@ -255,10 +246,13 @@ export async function POST(request: Request) {
   }
 
   if (session.status === "awaiting_contact_info") {
+    // Name + email only in this step — budget is asked separately, after
+    // these two are confirmed, so the client is never asked for all three at
+    // once and can never end up short exactly one of three things again.
     const providedName = turn.extracted_fields.contactName?.trim();
-    // Email has an unambiguous, easily-verified format, unlike the other two
-    // contact fields — extraction shouldn't depend on model reliability for it.
-    // Observed in production: a message containing a name, email, and budget
+    // Email has an unambiguous, easily-verified format, unlike the other
+    // contact fields — extraction shouldn't depend on model reliability for
+    // it. Observed in production: a message containing a name and email
     // together came back from the model with only the name extracted. Fall
     // back to pulling the email straight out of the raw message when the
     // model didn't find one.
@@ -273,37 +267,20 @@ export async function POST(request: Request) {
     if (providedName) sessionUpdate.contactName = providedName;
     if (providedEmail && !invalidEmail) sessionUpdate.contactEmail = providedEmail;
 
-    // Same reliability gap as email used to have, but worse in practice:
-    // budget is free text with nothing to regex-validate, so the model has to
-    // get the extraction right on its own — and observed in production, it
-    // repeatedly failed to on trivially simple replies ("1000", "One
-    // thousand"), leaving the client stuck being asked the same question in
-    // a loop with no way out. Gated specifically to name/email having been
-    // confirmed in an *earlier* turn (session.contactName/Email, not
-    // finalName/finalEmail — which would also be true on the very turn that
-    // first provides them, wrongly treating "my email is x1@y.com" itself as
-    // a budget answer just because it contains a digit). Only once this
-    // message is a dedicated follow-up with nothing else being asked is there
-    // nothing else the client's reply could reasonably be about — so if it
-    // looks at all budget-like, use the raw message as the answer rather than
-    // trusting extraction alone.
-    let budgetFallback: string | undefined;
-    if (
-      !hasContent(requirement.budget) &&
-      session.contactName &&
-      session.contactEmail &&
-      BUDGET_HINT_PATTERN.test(message)
-    ) {
-      budgetFallback = message.trim();
-    }
-    const hasBudget = hasContent(requirement.budget) || !!budgetFallback;
+    // Budget isn't asked about here, but it's still captured if the client
+    // volunteers it unprompted alongside their name/email (toRequirementUpdate
+    // already merged it above, since "budget" survives the field-stripping
+    // guard) — satisfies "if the client already gave a budget, don't ask
+    // again" without this step ever asking for it itself.
+    const hasBudget = hasContent(requirement.budget);
 
-    if (finalName && finalEmail && hasBudget) {
-      if (budgetFallback) {
-        await prisma.requirement.update({ where: { sessionId }, data: { budget: budgetFallback } });
-        requirement.budget = budgetFallback;
+    if (finalName && finalEmail) {
+      if (hasBudget) {
+        await finalize(finalName, finalEmail);
+      } else {
+        status = "awaiting_budget";
+        assistantContent = "Thanks! Could you also share your estimated budget?";
       }
-      await finalize(finalName, finalEmail);
     } else if (invalidEmail) {
       assistantContent = "That doesn't look like a valid email address — could you double check it?";
       status = "awaiting_contact_info";
@@ -316,9 +293,19 @@ export async function POST(request: Request) {
       const missing: string[] = [];
       if (!finalName) missing.push("your full name");
       if (!finalEmail) missing.push("your email address");
-      if (!hasBudget) missing.push("your estimated budget");
       assistantContent = `Thanks! Could you also share ${joinWithAnd(missing)}?`;
     }
+  } else if (session.status === "awaiting_budget") {
+    // A dedicated, single-purpose turn — nothing else is being asked here, so
+    // unlike email (which needs a format to validate) there's no ambiguity to
+    // guard against: whatever the client says is the budget. Prefers the
+    // model's own structured extraction when present (cleaner for the final
+    // summary than the raw sentence), falling back to the raw message so this
+    // step can never fail to resolve and loop back to asking again.
+    const providedBudget = turn.extracted_fields.budget?.trim() || message.trim();
+    await prisma.requirement.update({ where: { sessionId }, data: { budget: providedBudget } });
+    requirement.budget = providedBudget;
+    await finalize(session.contactName ?? "Not provided", session.contactEmail ?? "Not provided");
   } else {
     const userTurnCount = await prisma.message.count({ where: { sessionId, role: "user" } });
     const completion = checkCompletion(requirement as unknown as RequirementFields, userTurnCount + 1);
@@ -329,7 +316,7 @@ export async function POST(request: Request) {
       // since the system is taking over the flow now. Observed in production:
       // keeping it produced a confusing reply with two different questions
       // back to back, one of which the system was about to ignore anyway.
-      assistantContent = `${turn.reply_to_user}\n\nGreat, I think I have a solid understanding of your project! Before I put together your full summary and cost estimate, could you share your full name, email address, and your estimated budget?`;
+      assistantContent = `${turn.reply_to_user}\n\nGreat, I think I have a solid understanding of your project! Before I put together your full summary and cost estimate, could you share your full name and email address?`;
       status = "awaiting_contact_info";
     } else if (completion.status === "complete-partial") {
       await finalize(session.contactName ?? "Not provided", session.contactEmail ?? "Not provided");
