@@ -1,6 +1,17 @@
 import { prisma } from "@/lib/db";
 import { SubmissionsTable, type SubmissionRow } from "@/components/admin/SubmissionsTable";
 
+// This route has no dynamic API usage (no cookies()/headers()/uncached
+// fetch()), so without this, Next.js's build treats it as a static-rendering
+// candidate — on Vercel that means it's prerendered once and served as a
+// frozen snapshot from the CDN until the next deploy, regardless of what
+// changes in the database. next dev never applies this optimization, which
+// is why the staleness only ever showed up in production. force-dynamic
+// opts this page out of the Full Route Cache entirely: the Prisma query
+// below runs fresh on every request, matching what an admin dashboard
+// actually needs (always-current data, not cacheable at all).
+export const dynamic = "force-dynamic";
+
 export default async function AdminPage() {
   const sessions = await prisma.session.findMany({
     orderBy: { createdAt: "desc" },

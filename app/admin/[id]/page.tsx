@@ -6,6 +6,12 @@ import { RATE_CARD } from "@/lib/pricing";
 import { Card } from "@/components/ui/Card";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 
+// Same reasoning as app/admin/page.tsx — an admin data page should never be
+// served from Next.js's Full Route Cache. The dynamic [id] segment usually
+// already prevents that in practice, but making it explicit removes any
+// dependence on that inference holding across Next.js versions.
+export const dynamic = "force-dynamic";
+
 function formatField(value: unknown): string {
   if (value === null || value === undefined) return "—";
   if (Array.isArray(value)) {
