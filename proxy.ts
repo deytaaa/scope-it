@@ -10,10 +10,17 @@ export function proxy(request: NextRequest) {
   const auth = request.headers.get("authorization");
 
   if (auth?.startsWith("Basic ")) {
-    const decoded = atob(auth.slice("Basic ".length));
-    const password = decoded.slice(decoded.indexOf(":") + 1);
-    if (password === adminPassword) {
-      return NextResponse.next();
+    // atob() throws on a malformed/non-base64 payload — a crafted or corrupted
+    // header would otherwise crash the whole middleware invocation (a 500
+    // with no controlled response) instead of just failing auth normally.
+    try {
+      const decoded = atob(auth.slice("Basic ".length));
+      const password = decoded.slice(decoded.indexOf(":") + 1);
+      if (password === adminPassword) {
+        return NextResponse.next();
+      }
+    } catch {
+      // Fall through to the 401 below.
     }
   }
 
