@@ -14,7 +14,7 @@ export function PortfolioTeaser() {
     <section className="mx-auto max-w-4xl px-6 pb-24">
       <div
         className="animate-fade-in-up mb-6 flex items-end justify-between gap-4"
-        style={{ animationDelay: "620ms" }}
+        style={{ animationDelay: "880ms" }}
       >
         <div>
           <p className="m-0 mb-1 text-sm text-primary">See what we&apos;ve built</p>
@@ -34,7 +34,7 @@ export function PortfolioTeaser() {
             key={project.slug}
             href="/projects"
             className="elevated-card animate-fade-in-up group block overflow-hidden rounded-card border-[0.5px] border-border bg-card"
-            style={{ animationDelay: `${700 + i * 80}ms` }}
+            style={{ animationDelay: `${960 + i * 80}ms` }}
           >
             <div className="relative h-32 w-full overflow-hidden bg-chrome">
               <Image

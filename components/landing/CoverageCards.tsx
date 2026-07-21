@@ -22,7 +22,7 @@ export function CoverageCards() {
         <Card
           key={section.title}
           className="elevated-card animate-fade-in-up"
-          style={{ animationDelay: `${400 + i * 80}ms` }}
+          style={{ animationDelay: `${640 + i * 80}ms` }}
         >
           <p className="m-0 mb-2 text-sm text-primary">{section.title}</p>
           <p className="m-0 text-[13px] leading-relaxed text-secondary">{section.description}</p>
