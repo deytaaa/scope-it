@@ -10,7 +10,7 @@ export function SampleQuote() {
   return (
     <section
       className="animate-fade-in-up mx-auto max-w-md px-6 pb-16"
-      style={{ animationDelay: "320ms" }}
+      style={{ animationDelay: "560ms" }}
     >
       <p className="m-0 mb-3 text-center text-xs uppercase tracking-wide text-muted">
         Sample quote — illustrative only
