@@ -21,7 +21,7 @@ export function CoverageCards() {
       {SECTIONS.map((section, i) => (
         <Card
           key={section.title}
-          className="animate-fade-in-up"
+          className="elevated-card animate-fade-in-up"
           style={{ animationDelay: `${400 + i * 80}ms` }}
         >
           <p className="m-0 mb-2 text-sm text-primary">{section.title}</p>
