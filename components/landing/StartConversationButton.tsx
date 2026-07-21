@@ -37,6 +37,7 @@ export function StartConversationButton({ className, style }: StartConversationB
       <Pill onClick={startConversation} disabled={isStarting}>
         {isStarting ? "Starting…" : "Get my project estimate"}
       </Pill>
+      <p className="m-0 text-sm text-muted">Takes about 3 minutes · no signup needed</p>
       {error && <p className="m-0 text-sm text-secondary">{error}</p>}
     </div>
   );
