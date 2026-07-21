@@ -7,7 +7,7 @@ export function ProjectCard({ project, onOpen }: { project: Project; onOpen: () 
     <button
       type="button"
       onClick={onOpen}
-      className="project-card group flex h-full flex-col overflow-hidden rounded-card border-[0.5px] border-border bg-card text-left"
+      className="elevated-card group flex h-full flex-col overflow-hidden rounded-card border-[0.5px] border-border bg-card text-left"
     >
       <div className="relative h-44 w-full shrink-0 overflow-hidden bg-chrome">
         <Image
