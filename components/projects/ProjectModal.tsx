@@ -85,6 +85,21 @@ export function ProjectModal({ project, onClose }: { project: Project | null; on
         aria-modal="true"
         aria-labelledby="project-modal-title"
       >
+        {/* Zero-height sticky wrapper: stays pinned to the top of the
+            scrolling panel without taking up layout space itself, so the
+            close button floats above the image and every section below no
+            matter how far the client has scrolled through a long project. */}
+        <div className="sticky top-0 z-10 h-0">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-3 top-3 cursor-pointer transition-opacity duration-150 hover:opacity-70"
+          >
+            <KbdBadge>✕</KbdBadge>
+          </button>
+        </div>
+
         <div className="relative h-56 w-full overflow-hidden bg-chrome sm:h-72">
           <Image
             src={p.image}
@@ -97,30 +112,25 @@ export function ProjectModal({ project, onClose }: { project: Project | null; on
         </div>
 
         <div className="flex flex-col gap-6 px-6 py-6 sm:px-8 sm:py-8">
-          <div className="flex items-start justify-between gap-4">
-            <h2 id="project-modal-title" className="m-0 text-xl font-medium text-primary sm:text-2xl">
-              {p.title}
-            </h2>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="shrink-0 cursor-pointer transition-opacity duration-150 hover:opacity-70"
-            >
-              <KbdBadge>✕</KbdBadge>
-            </button>
-          </div>
+          <h2 id="project-modal-title" className="m-0 text-xl font-medium text-primary sm:text-2xl">
+            {p.title}
+          </h2>
 
           <Section label="Summary">
             <p className="m-0 text-sm leading-relaxed text-primary">{p.summary}</p>
           </Section>
 
+          {/* Bordered callout, not another plain paragraph — gives the reader
+              a visual anchor right after the title instead of a wall of
+              identically-styled text sections. */}
           <Section label="Problem">
-            <p className="m-0 text-sm leading-relaxed text-primary">{p.problem}</p>
+            <div className="rounded-card border-[0.5px] border-border bg-chrome px-4 py-3.5">
+              <p className="m-0 text-sm leading-relaxed text-primary">{p.problem}</p>
+            </div>
           </Section>
 
           <Section label="Key features">
-            <ul className="m-0 flex list-none flex-col gap-1.5 pl-0">
+            <ul className="m-0 grid list-none grid-cols-1 gap-x-4 gap-y-1.5 pl-0 sm:grid-cols-2">
               {p.keyFeatures.map((feature) => (
                 <li
                   key={feature}
